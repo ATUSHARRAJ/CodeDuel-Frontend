@@ -1,36 +1,21 @@
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import './index.css';
-import App from './App';
-import SearchBar from './Pages/SearchBar';
-import EMI from './Pages/EMI';
-import EMICalculator from './Pages/EMICalculator';
-import Customer from './Pages/Customer';
-import CustomerDetails from './Pages/CustomerEntry';
-import CoBorrowerEntry from './Pages/CoBorrowerEntry';
-import GuarantorEntry from './Pages/GuarantorEntry';
-import LoanEntry from './Pages/LoanEntry';
-import Sidebar from './Pages/Sidebar';
-import SearchCustomer from './Search/SearchCustomer.jsx';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import React from "react";
+import ReactDOM from "react-dom/client";
+import "./index.css";                    // <- Tailwind must be imported here
+import App from "./App";
+import { BrowserRouter } from "react-router-dom";
+import { GoogleOAuthProvider } from "@react-oauth/google";
+import { ProfileProvider } from './context/ProfileDataStore';
 
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(
+const clientId = process.env.REACT_APP_GOOGLE_CLIENT_ID || "202210728249-obd5sej8gksiti2j10fu2oa568jj5cpc.apps.googleusercontent.com";
+
+ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<App />} />
-        <Route path="/about" element={<SearchBar />} />
-        <Route path="/Emi" element={<EMI />} />
-        <Route path="/EmiCalculator" element={<EMICalculator />} />
-        <Route path="/Customer" element={<Customer />} />
-        <Route path="/CustomerDetails" element={<CustomerDetails />} />
-        <Route path="/CoBorrowEntry" element={<CoBorrowerEntry />} />
-        <Route path="/GuarantorEntry" element={<GuarantorEntry />} />
-        <Route path="/LoanEntry" element={<LoanEntry />} />
-        <Route path="/Sidebar" element={<Sidebar />} />
-        <Route path="/SearchCustomer" element={<SearchCustomer />} />
-      </Routes>
+      <GoogleOAuthProvider clientId={clientId}>
+        <ProfileProvider>
+        <App />
+        </ProfileProvider>
+      </GoogleOAuthProvider>
     </BrowserRouter>
-  </React.StrictMode> 
+  </React.StrictMode>
 );
