@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import MatchmakingModal from './MatchmakingModel';
 import MatchmakingSearch from './MatchmakingSearch';
@@ -11,11 +11,14 @@ const MatchmakingLandingPage = () => {
   const [isMatchmakingModalOpen, setIsMatchmakingModalOpen] = useState(true);
   const [isMatchmakingSearching, setIsMatchmakingSearching] = useState(false);
   
-  // State to store current search preferences
+  // State for UI
   const [matchmakingPreferences, setMatchmakingPreferences] = useState({
     language: 'Any', 
     type: 'Ranked', 
   });
+
+  // 🆕 REF: Keeps track of latest preference so Socket Listener can read it accurately
+  const preferencesRef = useRef(matchmakingPreferences);
 
   useEffect(() => {
     // 1. Socket Listeners
@@ -26,14 +29,19 @@ const MatchmakingLandingPage = () => {
       console.log('>>> Match found! Room:', data.roomId);
       setIsMatchmakingSearching(false);
       
-      // ✅ FIX: Passing 'players' so Arena knows opponent name
+      // 🆕 Get the language the user actually selected
+      // If they chose 'Any', we default to 'Python' for the Arena
+      let userLang = preferencesRef.current.language;
+      if (userLang === 'Any') userLang = 'Python';
+
       navigate(`/game-arena/${encodeURIComponent(data.roomId)}`, {
         state: { 
             type: "startMatch", 
             problemId: data.problemId,
-            isRanked: data.isRanked, // Backend sends this
-            players: data.players,   // Critical: Contains usernames
-            difficulty: "Adaptive"
+            isRanked: data.isRanked, 
+            players: data.players,
+            difficulty: "Adaptive",
+            preferredLanguage: userLang // <--- PASSING IT HERE
         }
       });
     };
@@ -41,7 +49,7 @@ const MatchmakingLandingPage = () => {
     const handleUserDisconnected = () => {
         setIsMatchmakingSearching(false);
         alert("Opponent disconnected during search.");
-        setIsMatchmakingModalOpen(true); // Re-open modal
+        setIsMatchmakingModalOpen(true); 
     };
 
     socket.on('connect', handleConnect);
@@ -49,7 +57,6 @@ const MatchmakingLandingPage = () => {
     socket.on('match_found', handleMatchFound);
     socket.on('user-disconnected', handleUserDisconnected);
 
-    // Auto-connect if not connected
     if (!socket.connected) socket.connect();
 
     return () => {
@@ -64,32 +71,31 @@ const MatchmakingLandingPage = () => {
 
   // 2. START MATCHMAKING
   const handleStartMatchmaking = ({ language, type }) => {
-    
-    // A. Check for User ID in Storage
     const userAuthId = localStorage.getItem('userAuthId');
     const token = localStorage.getItem('token');
 
-    // B. Validation
     if (!userAuthId || !token) {
         alert("⚠️ You must be logged in to play.");
         navigate('/login');
         return;
     }
 
-    // ✅ FIX: Convert UI type ("Ranked") to Backend mode ("ranked" or "casual")
     const mode = type.toLowerCase(); 
 
     console.log(`Initiating ${mode} Match for User: ${userAuthId}`);
 
     setIsMatchmakingModalOpen(false);
+    
+    // Update State & Ref
     setMatchmakingPreferences({ language, type });
+    preferencesRef.current = { language, type }; // <--- Update Ref immediately
+    
     setIsMatchmakingSearching(true);
 
-    // C. Emit Search Event
     const emitSearch = () => {
         socket.emit('find_match', { 
             userAuthId, 
-            mode: mode // Critical: Tells server which queue to use
+            mode: mode 
         });
     };
 
@@ -129,14 +135,12 @@ const MatchmakingLandingPage = () => {
       <h1 className="text-4xl font-bold mt-20 mb-8">Ready to Duel?</h1>
       <p className="text-lg text-gray-300 mb-8">Finding opponents with similar skill rating...</p>
 
-      {/* MODAL (Selection) */}
       <MatchmakingModal
         isOpen={isMatchmakingModalOpen}
         onClose={handleCloseMatchmakingModal}
         onStartMatchmaking={handleStartMatchmaking} 
       />
 
-      {/* SEARCHING UI (Loader) */}
       <MatchmakingSearch
         isOpen={isMatchmakingSearching}
         selectedLanguage={matchmakingPreferences.language}

@@ -6,7 +6,7 @@ import { fetchMySolvedProblems } from '../data/solvedProblemsData';
 import { 
   FaSearch, FaFilter, FaCodeBranch, FaLaptopCode, 
   FaSpinner, FaExclamationCircle, FaCheckCircle, 
-  FaArrowLeft, FaDice, FaChartPie 
+  FaArrowLeft, FaDice, FaChartPie, FaEye, FaTimes 
 } from 'react-icons/fa';
 
 const PracticePage = ({ user }) => {
@@ -17,7 +17,14 @@ const PracticePage = ({ user }) => {
 
     // --- Local State ---
     const [displayedChallenges, setDisplayedChallenges] = useState([]); 
-    const [solvedIds, setSolvedIds] = useState([]); 
+    
+    // Store full solution objects mapped by ID
+    // Format: { 1: { code: "...", language: "cpp" }, 2: { ... } }
+    const [userSolutions, setUserSolutions] = useState({}); 
+
+    // Modal State
+    const [showCodeModal, setShowCodeModal] = useState(false);
+    const [selectedSolution, setSelectedSolution] = useState(null);
     
     // Filters
     const [searchTerm, setSearchTerm] = useState('');
@@ -37,9 +44,28 @@ const PracticePage = ({ user }) => {
         const loadSolvedStatus = async () => {
             if (user) {
                 try {
-                    const data = await fetchMySolvedProblems();
-                    const ids = data.map(item => item.problemId);
-                    setSolvedIds(ids);
+                    // 1. CALL API (This function needs to return the data from /api/solved-problems/me)
+                    const response = await fetchMySolvedProblems(); 
+                    
+                    // Handle if response is wrapped in { success: true, data: [...] } or just [...]
+                    const data = response.data || response; 
+
+                    // 2. Convert to Map for O(1) Lookup
+                    const solutionsMap = {};
+                    
+                    if (Array.isArray(data)) {
+                        data.forEach(item => {
+                            // Ensure we use the correct ID field (problemId)
+                            solutionsMap[item.problemId] = item;
+                        });
+                    } else if (data.problems && Array.isArray(data.problems)) {
+                         // If your backend returns the nested array structure directly
+                         data.problems.forEach(item => {
+                            solutionsMap[item.problemId] = item;
+                        });
+                    }
+                    
+                    setUserSolutions(solutionsMap);
                 } catch (err) {
                     console.error("Failed to load solved status", err);
                 }
@@ -50,6 +76,8 @@ const PracticePage = ({ user }) => {
 
     // --- Filter Logic ---
     useEffect(() => {
+        if (!problems) return;
+
         let filtered = problems.filter(challenge => {
             const titleMatch = challenge.title 
                 ? challenge.title.toLowerCase().includes(searchTerm.toLowerCase()) 
@@ -72,19 +100,21 @@ const PracticePage = ({ user }) => {
         setDisplayedChallenges(filtered);
     }, [problems, searchTerm, filterDifficulty, filterTopic, filterLanguage]);
 
-    // --- 🆕 Feature 1: CALCULATE STATS ---
+    // --- CALCULATE STATS ---
     const getStats = () => {
-        const totalSolved = solvedIds.length;
+        const solvedIdList = Object.keys(userSolutions).map(Number);
+
+        const totalSolved = solvedIdList.length;
         const totalProblems = problems.length;
         
         const easyTotal = problems.filter(p => p.difficulty === 'Easy').length;
-        const easySolved = problems.filter(p => p.difficulty === 'Easy' && solvedIds.includes(Number(p.id))).length;
+        const easySolved = problems.filter(p => p.difficulty === 'Easy' && solvedIdList.includes(Number(p.id))).length;
 
         const mediumTotal = problems.filter(p => p.difficulty === 'Medium').length;
-        const mediumSolved = problems.filter(p => p.difficulty === 'Medium' && solvedIds.includes(Number(p.id))).length;
+        const mediumSolved = problems.filter(p => p.difficulty === 'Medium' && solvedIdList.includes(Number(p.id))).length;
 
         const hardTotal = problems.filter(p => p.difficulty === 'Hard').length;
-        const hardSolved = problems.filter(p => p.difficulty === 'Hard' && solvedIds.includes(Number(p.id))).length;
+        const hardSolved = problems.filter(p => p.difficulty === 'Hard' && solvedIdList.includes(Number(p.id))).length;
 
         return { totalSolved, totalProblems, easyTotal, easySolved, mediumTotal, mediumSolved, hardTotal, hardSolved };
     };
@@ -98,9 +128,17 @@ const PracticePage = ({ user }) => {
         });
     };
 
-    // --- 🆕 Feature 2: SURPRISE ME (Random Pick) ---
+    const handleViewCode = (problemId, title) => {
+        const solution = userSolutions[problemId];
+        if (solution) {
+            setSelectedSolution({ ...solution, title });
+            setShowCodeModal(true);
+        }
+    };
+
     const handleSurpriseMe = () => {
-        const unsolvedProblems = problems.filter(p => !solvedIds.includes(Number(p.id)));
+        const solvedIdList = Object.keys(userSolutions).map(Number);
+        const unsolvedProblems = problems.filter(p => !solvedIdList.includes(Number(p.id)));
         
         if (unsolvedProblems.length === 0) {
             alert("Wow! You've solved everything! 🎉");
@@ -137,8 +175,43 @@ const PracticePage = ({ user }) => {
     }
 
     return (
-        <div className="min-h-screen bg-gray-900 text-white p-8">
+        <div className="min-h-screen bg-gray-900 text-white p-8 relative">
             
+            {/* CODE VIEW MODAL */}
+            {showCodeModal && selectedSolution && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn">
+                    <div className="bg-gray-800 w-full max-w-3xl rounded-xl border border-gray-600 shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
+                        <div className="bg-gray-900 p-4 border-b border-gray-700 flex justify-between items-center">
+                            <div>
+                                <h3 className="text-xl font-bold text-white">{selectedSolution.title}</h3>
+                                <p className="text-sm text-gray-400">Language: <span className="text-blue-400 font-mono">{selectedSolution.language}</span></p>
+                            </div>
+                            <button 
+                                onClick={() => setShowCodeModal(false)}
+                                className="p-2 hover:bg-gray-700 rounded-full transition"
+                            >
+                                <FaTimes className="text-xl text-gray-400 hover:text-white" />
+                            </button>
+                        </div>
+                        
+                        <div className="p-0 overflow-auto bg-[#1e1e1e] custom-scrollbar flex-grow">
+                            <pre className="p-4 font-mono text-sm text-gray-300 whitespace-pre-wrap">
+                                {selectedSolution.code}
+                            </pre>
+                        </div>
+
+                        <div className="p-4 bg-gray-900 border-t border-gray-700 flex justify-end">
+                            <button 
+                                onClick={() => setShowCodeModal(false)}
+                                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-white text-sm font-semibold transition"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Header */}
             <header className="w-full max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center py-4 mb-8 border-b border-gray-700">
                 <h1 className="text-4xl font-bold mb-4 md:mb-0">Practice Arena</h1>
@@ -149,7 +222,6 @@ const PracticePage = ({ user }) => {
                     >
                         <FaDice className="mr-2" /> Surprise Me
                     </button>
-                    {/* ✅ FIX: navigate('/') use kiya hai */}
                     <button
                         onClick={() => navigate('/')} 
                         className="flex items-center px-6 py-2 rounded-md bg-gray-700 text-white font-semibold hover:bg-gray-600 transition-colors duration-300 shadow-md"
@@ -159,7 +231,7 @@ const PracticePage = ({ user }) => {
                 </div>
             </header>
 
-            {/* 🆕 STATS DASHBOARD */}
+            {/* STATS DASHBOARD */}
             <div className="w-full max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
                 <div className="bg-gray-800 p-4 rounded-lg border border-gray-700 flex items-center justify-between">
                     <div>
@@ -213,7 +285,7 @@ const PracticePage = ({ user }) => {
                         className="flex-grow bg-transparent outline-none text-white placeholder-gray-500"
                     />
                 </div>
-                {/* Filters Dropdowns (Same as before) */}
+                {/* Filters Dropdowns */}
                 <div className="flex items-center">
                     <FaFilter className="text-gray-400 mr-2" />
                     <select
@@ -263,10 +335,11 @@ const PracticePage = ({ user }) => {
             <div className="w-full max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {displayedChallenges.length > 0 ? (
                     displayedChallenges.map(challenge => {
-                        const isSolved = solvedIds.includes(Number(challenge.id));
+                        const solution = userSolutions[challenge.id];
+                        const isSolved = !!solution;
 
                         return (
-                            <div key={challenge._id} className={`bg-gray-800 flex flex-col justify-between p-6 rounded-xl shadow-lg border ${isSolved ? 'border-green-500/50' : 'border-gray-700'} hover:border-blue-500 transition-all duration-300 hover:-translate-y-1`}>
+                            <div key={challenge.id} className={`bg-gray-800 flex flex-col justify-between p-6 rounded-xl shadow-lg border ${isSolved ? 'border-green-500/50' : 'border-gray-700'} hover:border-blue-500 transition-all duration-300 hover:-translate-y-1`}>
                                 
                                 <div>
                                     <div className="flex justify-between items-start mb-2">
@@ -303,16 +376,31 @@ const PracticePage = ({ user }) => {
                                     </div>
                                 </div>
 
-                                <button
-                                    onClick={() => handleStartChallenge(challenge.id)}
-                                    className={`w-full py-2 rounded-lg font-semibold shadow-lg transition-all ${
-                                        isSolved 
-                                        ? "bg-gray-700 text-green-400 hover:bg-gray-600 border border-green-900" 
-                                        : "bg-gradient-to-r from-blue-600 to-blue-500 text-white hover:from-blue-500 hover:to-blue-400 shadow-blue-900/30"
-                                    }`}
-                                >
-                                    {isSolved ? "Solve Again" : "Solve Challenge"}
-                                </button>
+                                <div className="flex gap-2">
+                                    {isSolved ? (
+                                        <>
+                                            <button
+                                                onClick={() => handleViewCode(challenge.id, challenge.title)}
+                                                className="flex-1 py-2 rounded-lg font-semibold bg-gray-700 text-gray-300 hover:bg-gray-600 border border-gray-600 transition-all text-sm flex items-center justify-center gap-2"
+                                            >
+                                                <FaEye /> View Code
+                                            </button>
+                                            <button
+                                                onClick={() => handleStartChallenge(challenge.id)}
+                                                className="flex-1 py-2 rounded-lg font-semibold bg-green-900/40 text-green-400 hover:bg-green-900/60 border border-green-900/60 transition-all text-sm"
+                                            >
+                                                Solve Again
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <button
+                                            onClick={() => handleStartChallenge(challenge.id)}
+                                            className="w-full py-2 rounded-lg font-semibold shadow-lg transition-all bg-gradient-to-r from-blue-600 to-blue-500 text-white hover:from-blue-500 hover:to-blue-400 shadow-blue-900/30"
+                                        >
+                                            Solve Challenge
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         );
                     })

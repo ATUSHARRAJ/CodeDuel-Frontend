@@ -51,7 +51,7 @@ const App = () => {
     // Token save hone ke baad ye function call hoga aur data store mein aa jayega
     await fetchUserProfile();
     
-    console.log("✅ Profile fetched immediately after login");
+    
   };
 
   const handleLogout = () => {
