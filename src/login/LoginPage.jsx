@@ -53,7 +53,6 @@ const LoginPage = ({ onLogin }) => {
     useEffect(() => {
         const queryParams = new URLSearchParams(location.search);
         const githubCode = queryParams.get("code");
-        console.log("GitHub Code from URL:", githubCode);
 
         if (githubCode && !hasFetchedCode.current) {
             hasFetchedCode.current = true; // Mark as used immediately
@@ -66,7 +65,6 @@ const LoginPage = ({ onLogin }) => {
                 setError("");
                 try {
                     const res = await axios.post(`${API_URL}/api/auth/github-login`, { code: githubCode });
-                    console.log("Backend Response:", res.data);
                     handleBackendResponse(res.data);
                 } catch (err) {
                     console.error("GitHub Login Error:", err);
