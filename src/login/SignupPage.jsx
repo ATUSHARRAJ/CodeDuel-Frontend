@@ -46,7 +46,7 @@ const SignupPage = ({ onSignupSuccess }) => {
   const [showPassword, setShowPassword] = useState(false); // Toggle password
   const [formData, setFormData] = useState({ name: "", email: "", password: "" });
 
-  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3000";
+  const API_URL = process.env.REACT_APP_BACKEND_URL || "http://localhost:3000";
   const GITHUB_CLIENT_ID = process.env.REACT_APP_GITHUB_CLIENT_ID;
   const GITHUB_REDIRECT_URI = process.env.REACT_APP_GITHUB_REDIRECT_URI || "http://localhost:3001/login";
 

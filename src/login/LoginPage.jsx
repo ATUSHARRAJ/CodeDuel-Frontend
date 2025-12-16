@@ -42,7 +42,7 @@ const LoginPage = ({ onLogin }) => {
     const [viewMode, setViewMode] = useState('social'); 
 
     // Env Variables
-    const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3000";
+    const API_URL = process.env.REACT_APP_BACKEND_URL || "http://localhost:3000";
     const GITHUB_CLIENT_ID = process.env.REACT_APP_GITHUB_CLIENT_ID;
     const GITHUB_REDIRECT_URI = process.env.REACT_APP_GITHUB_REDIRECT_URI || "http://localhost:3001/login";
 
@@ -53,6 +53,7 @@ const LoginPage = ({ onLogin }) => {
     useEffect(() => {
         const queryParams = new URLSearchParams(location.search);
         const githubCode = queryParams.get("code");
+        console.log("GitHub Code from URL:", githubCode);
 
         if (githubCode && !hasFetchedCode.current) {
             hasFetchedCode.current = true; // Mark as used immediately
@@ -65,6 +66,7 @@ const LoginPage = ({ onLogin }) => {
                 setError("");
                 try {
                     const res = await axios.post(`${API_URL}/api/auth/github-login`, { code: githubCode });
+                    console.log("Backend Response:", res.data);
                     handleBackendResponse(res.data);
                 } catch (err) {
                     console.error("GitHub Login Error:", err);
