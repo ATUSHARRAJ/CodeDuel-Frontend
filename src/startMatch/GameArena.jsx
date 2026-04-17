@@ -415,32 +415,46 @@ const GameArena = () => {
   //   }
   // };
 
-  const handleRunCode = async () => {
+ const handleRunCode = async () => {
   const langKey = selectedLanguage.toLowerCase() === 'c++' ? 'cpp' : selectedLanguage.toLowerCase();
-  
+
   let driverTemplate = null;
   if (currentProblem.driverCodeTemplates) {
-      driverTemplate = currentProblem.driverCodeTemplates[langKey];
+    driverTemplate = currentProblem.driverCodeTemplates[langKey];
   }
 
+  // fallback → no template
   if (!driverTemplate || !driverTemplate.trim()) {
-      await handleSubmitCode(); 
-      return; 
+    await handleSubmitCode();
+    return;
   }
 
   if (!userCode.trim()) {
     setOutput("Error: Empty code.");
     return;
   }
-  
+
   setIsRunning(true);
   setOutput("Running...\n");
   setIsOutputError(false);
 
   try {
-    let finalCode = driverTemplate.replace("##USER_CODE_HERE##", userCode);
+    // ✅ SAFE DRIVER CODE
+    let finalCode = "";
+    if (driverTemplate && driverTemplate.includes("##USER_CODE_HERE##")) {
+      finalCode = driverTemplate.replace("##USER_CODE_HERE##", userCode);
+    } else {
+      finalCode = userCode;
+    }
 
-    // ✅ LANGUAGE ID MAP (Judge0)
+    // ❌ prevent empty request (fix 422)
+    if (!finalCode || finalCode.trim() === "") {
+      setOutput("Error: Code is empty.");
+      setIsRunning(false);
+      return;
+    }
+
+    // ✅ Judge0 language mapping
     const getLanguageId = (lang) => {
       switch (lang) {
         case "C++": return 54;
@@ -451,22 +465,21 @@ const GameArena = () => {
       }
     };
 
-    const response = await fetch(
-      "https://ce.judge0.com/submissions?base64_encoded=false&wait=true",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          source_code: finalCode,
-          language_id: getLanguageId(selectedLanguage)
-        })
-      }
-    );
+    // ⚠️ NOTE: variable name piston hai but API Judge0 hai
+    const response = await fetch(PISTON_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        source_code: finalCode,                 // ✅ required
+        language_id: getLanguageId(selectedLanguage) // ✅ required
+      })
+    });
 
     const data = await response.json();
 
+    // ✅ Judge0 response handling
     const output = data.stdout || "";
     const error = data.stderr || data.compile_output;
 
