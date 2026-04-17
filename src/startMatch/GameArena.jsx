@@ -362,58 +362,129 @@ const GameArena = () => {
   }, [isMultiplayer, matchResult, myAuthId, location.state, updateLocalStats, profile]);
 
   // --- HANDLE RUN CODE ---
-  const handleRunCode = async () => {
-    const langKey = selectedLanguage.toLowerCase() === 'c++' ? 'cpp' : selectedLanguage.toLowerCase();
+  // const handleRunCode = async () => {
+  //   const langKey = selectedLanguage.toLowerCase() === 'c++' ? 'cpp' : selectedLanguage.toLowerCase();
     
-    let driverTemplate = null;
-    if (currentProblem.driverCodeTemplates) {
-        driverTemplate = currentProblem.driverCodeTemplates[langKey];
-    }
+  //   let driverTemplate = null;
+  //   if (currentProblem.driverCodeTemplates) {
+  //       driverTemplate = currentProblem.driverCodeTemplates[langKey];
+  //   }
 
-    // 🛑 FALLBACK: IF NO DRIVER CODE -> SUBMIT DIRECTLY (Handles Java/Missing templates)
-    if (!driverTemplate || !driverTemplate.trim()) {
-        await handleSubmitCode(); 
-        return; 
-    }
+  //   // 🛑 FALLBACK: IF NO DRIVER CODE -> SUBMIT DIRECTLY (Handles Java/Missing templates)
+  //   if (!driverTemplate || !driverTemplate.trim()) {
+  //       await handleSubmitCode(); 
+  //       return; 
+  //   }
 
-    if (!userCode.trim()) return setOutput("Error: Empty code.");
+  //   if (!userCode.trim()) return setOutput("Error: Empty code.");
     
-    setIsRunning(true);
-    setOutput("Compiling & Testing...\n");
-    setIsOutputError(false);
+  //   setIsRunning(true);
+  //   setOutput("Compiling & Testing...\n");
+  //   setIsOutputError(false);
 
-    try {
-        let finalCode = driverTemplate.replace("##USER_CODE_HERE##", userCode);
-        const langConfig = LANGUAGE_CONFIG[selectedLanguage];
+  //   try {
+  //       let finalCode = driverTemplate.replace("##USER_CODE_HERE##", userCode);
+  //       const langConfig = LANGUAGE_CONFIG[selectedLanguage];
 
-        const response = await fetch(PISTON_API_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ 
-                language: langConfig.piston, 
-                version: langConfig.version, 
-                files: [{ name: langConfig.file, content: finalCode }] 
-            })
-        });
+  //       const response = await fetch(PISTON_API_URL, {
+  //           method: "POST",
+  //           headers: { "Content-Type": "application/json" },
+  //           body: JSON.stringify({ 
+  //               language: langConfig.piston, 
+  //               version: langConfig.version, 
+  //               files: [{ name: langConfig.file, content: finalCode }] 
+  //           })
+  //       });
         
-        const data = await response.json();
-        if (data.run) {
-            const runOutput = data.run.output || "";
-            const isLogicError = runOutput.includes("Wrong Answer");
+  //       const data = await response.json();
+  //       if (data.run) {
+  //           const runOutput = data.run.output || "";
+  //           const isLogicError = runOutput.includes("Wrong Answer");
 
-            setOutput(runOutput || (data.run.code === 0 ? "Success (No Output)" : "Runtime Error"));
-            setIsOutputError(data.run.code !== 0 || isLogicError);
-        } else {
-            setOutput("API Error");
-        }
+  //           setOutput(runOutput || (data.run.code === 0 ? "Success (No Output)" : "Runtime Error"));
+  //           setIsOutputError(data.run.code !== 0 || isLogicError);
+  //       } else {
+  //           setOutput("API Error");
+  //       }
 
-    } catch (err) {
-        setOutput(`Execution Error: ${err.message}`);
-        setIsOutputError(true);
-    } finally {
-        setIsRunning(false);
+  //   } catch (err) {
+  //       setOutput(`Execution Error: ${err.message}`);
+  //       setIsOutputError(true);
+  //   } finally {
+  //       setIsRunning(false);
+  //   }
+  // };
+
+  const handleRunCode = async () => {
+  const langKey = selectedLanguage.toLowerCase() === 'c++' ? 'cpp' : selectedLanguage.toLowerCase();
+  
+  let driverTemplate = null;
+  if (currentProblem.driverCodeTemplates) {
+      driverTemplate = currentProblem.driverCodeTemplates[langKey];
+  }
+
+  if (!driverTemplate || !driverTemplate.trim()) {
+      await handleSubmitCode(); 
+      return; 
+  }
+
+  if (!userCode.trim()) {
+    setOutput("Error: Empty code.");
+    return;
+  }
+  
+  setIsRunning(true);
+  setOutput("Running...\n");
+  setIsOutputError(false);
+
+  try {
+    let finalCode = driverTemplate.replace("##USER_CODE_HERE##", userCode);
+
+    // ✅ LANGUAGE ID MAP (Judge0)
+    const getLanguageId = (lang) => {
+      switch (lang) {
+        case "C++": return 54;
+        case "Java": return 62;
+        case "Python": return 71;
+        case "JavaScript": return 63;
+        default: return 71;
+      }
+    };
+
+    const response = await fetch(
+      "https://ce.judge0.com/submissions?base64_encoded=false&wait=true",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          source_code: finalCode,
+          language_id: getLanguageId(selectedLanguage)
+        })
+      }
+    );
+
+    const data = await response.json();
+
+    const output = data.stdout || "";
+    const error = data.stderr || data.compile_output;
+
+    if (data.status.id !== 3) {
+      setOutput(error || "Execution Failed");
+      setIsOutputError(true);
+    } else {
+      setOutput(output || "Success");
+      setIsOutputError(false);
     }
-  };
+
+  } catch (err) {
+    setOutput(`Execution Error: ${err.message}`);
+    setIsOutputError(true);
+  } finally {
+    setIsRunning(false);
+  }
+};
 
   // --- HANDLE SUBMIT ---
   const handleSubmitCode = async () => {
