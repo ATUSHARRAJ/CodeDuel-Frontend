@@ -16,7 +16,7 @@ import Chat from './Chat';
 import { highlightSyntax } from './syntaxConfig';
 
 // --- Constants ---
-const PISTON_API_URL = "https://emkc.org/api/v2/piston/execute";
+const PISTON_API_URL = "https://ce.judge0.com/submissions?base64_encoded=false&wait=true";
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
 
 const LANGUAGE_CONFIG = {
